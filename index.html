@@ -10,7 +10,13 @@
         body {
             /* set margin to 0 and overflow to hidden, to go fullscreen */
             margin: 0;
-            overflow: hidden;
+            /* overflow: hidden; */
+        }
+        #WebGL-output,#WebGL-output-vertical,#WebGL-output-left,#WebGL-output-front{
+            width:500px;
+            height:500px;
+            margin:0 20px;
+            display: inline-block;
         }
     </style>
 </head>
@@ -18,9 +24,13 @@
 <body>
     <div id="Stats-output"></div>
     <div id="WebGL-output"></div>
-    <script type="text/javascript" src="./libs/three.js"></script>
+    <div id="WebGL-output-vertical"></div>
+    <div id="WebGL-output-left"></div>
+    <div id="WebGL-output-front"></div>
+    <script type="text/javascript" src="./build/three.js"></script>
     <script type="text/javascript" src="./libs/SceneLoader.js"></script>
     <script type="text/javascript" src="./libs/SceneExporter.js"></script>
+    <script src="./libs/TrackballControls.js"></script>
 
     <script type="text/javascript" src="./libs/stats.js"></script>
     <script type="text/javascript" src="./libs/dat.gui.js"></script>

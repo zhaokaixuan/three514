@@ -1,71 +1,88 @@
-function init() {
+function init(dom) {
+    var domEle = dom;
+    var domRect = domEle.getBoundingClientRect();
     var stats = initStats();
+    var clock = new THREE.Clock();
     var scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000)
 
-    var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    var camera = new THREE.PerspectiveCamera(45, domRect.width / domRect.height, 0.1, 1000);
     camera.position.x = -30;
-    camera.position.y = 40;
-    camera.position.z = 30;
-    camera.lookAt(scene.position);
+    camera.position.y = 50;
+    camera.position.z = 20;
 
-    var renderer = new THREE.WebGLRenderer();
+    camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+    var renderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
     renderer.setClearColor(new THREE.Color(0xEEEEEE, 1.0));
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(domRect.width, domRect.height);
+    renderer.shadowMapEnabled = true;
+    //trackball
+    var trackballControls = new THREE.TrackballControls(camera, domEle);
+    trackballControls.rotateSpeed = 1.0;
+    trackballControls.zoomSpeed = 1.0;
+    trackballControls.panSpeed = 1.0;
+    trackballControls.staticMoving = true;
+
 
     //add subtle ambient lighting
     var ambientLight = new THREE.AmbientLight(0x0c0c0c);
     scene.add(ambientLight);
 
     //add spotlight for the shadows
-    var pointLight = new THREE.PointLight(0xffffff);
-    pointLight.position.set(-40, 60, -10);
-    scene.add(pointLight);
+    var spotLight = new THREE.SpotLight(0xffffff);
+    spotLight.position.set(-40, 60, -10);
+    spotLight.castShadow = true;
+    scene.add(spotLight);
 
-    var axes = new THREE.AxisHelper(20);
+    var axes = new THREE.AxisHelper(100);
     scene.add(axes);
 
+    var size = 50;
+    var divisions = 10;
+    var gridHelper = new THREE.GridHelper(size, divisions);
+    scene.add(gridHelper);
 
-    //create the ground plane
-    var planeGeometry = new THREE.PlaneGeometry(60, 40, 1, 1);
-    var planeMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
-    var plane = new THREE.Mesh(planeGeometry, planeMaterial);
 
-    plane.rotation.x = -0.5 * Math.PI;
-    plane.position.x = 0;
-    plane.position.y = 0;
-    plane.position.z = 0;
-
-    scene.add(plane);
 
     //create a cube
-    var cubeGeometry = new THREE.BoxGeometry(4, 4, 4);
-    var cubeMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
-    var cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+    var cubeGeometry = new THREE.EdgesGeometry(new THREE.BoxGeometry(4, 4, 4));
 
-    cube.position.x = -4;
-    cube.position.y = 3;
+    var cubeMaterial = new THREE.MeshBasicMaterial({
+        color: 0x7777ff,
+        linewidth: 10
+    });
+    var cube = new THREE.LineSegments(cubeGeometry, cubeMaterial);
+
+    cube.position.x = 0;
+    cube.position.y = 2;
     cube.position.z = 0;
 
-    scene.add(cube);
+    //scene.add(cube);
 
-
+    //create a group
+    var group = new THREE.Group();
+    group.add(cube);
+    scene.add(group)
 
 
     //add the output of the renderer to the html element
-    document.getElementById('WebGL-output').appendChild(renderer.domElement);
+    domEle.appendChild(renderer.domElement);
 
-    
+
 
     function render() {
         stats.update();
+        var delta = clock.getDelta();
+        trackballControls.update(delta);
         cube.visible = controls.visible;
         cube.rotation.x = controls.rotationX;
         cube.rotation.y = controls.rotationY;
         cube.rotation.z = controls.rotationZ;
         cube.scale.set(controls.scaleX, controls.scaleY, controls.scaleZ);
 
-        requestAnimationFrame(render);
         renderer.render(scene, camera);
+        requestAnimationFrame(render);
     }
 
     function initStats() {
@@ -82,6 +99,7 @@ function init() {
     //call the render function
     var step = 0;
     var controls = new function () {
+
         this.scaleX = 1;
         this.scaleY = 1;
         this.scaleZ = 1;
@@ -148,37 +166,200 @@ function init() {
 
     gui.add(controls, 'visible');
 
-
     render();
 
     //场景对浏览器的自适应
-    window.addEventListener('resize',onResize,false);
-    function onResize(){
-        camera.aspect = window.innerWidth / window.innerHeight;
+    domEle.addEventListener('resize', onResize, false);
+    function onResize() {
+        camera.aspect = domRect.width / domRect.height;
         camera.updateProjectionMatrix();
-        renderer.setSize( window.innerWidth, window.innerHeight);
+        renderer.setSize(domRect.width, domRect.height);
     }
 
     //选中图形
-    document.addEventListener('mousedown', onDocumentMouseDown, false);
+    domEle.addEventListener('mousedown', onDocumentMouseDown, false);
+    var INTERSECTED;
     function onDocumentMouseDown(event) {
+        event.preventDefault();
 
-        var vector = new THREE.Vector3(( event.clientX / window.innerWidth ) * 2 - 1, -( event.clientY / window.innerHeight ) * 2 + 1, 0.5);
+        var vector = new THREE.Vector3(((event.clientX - domRect.left) / domRect.width) * 2 - 1, -((event.clientY - domRect.top) / domRect.height) * 2 + 1, 0.5);
         vector = vector.unproject(camera);
 
         var raycaster = new THREE.Raycaster(camera.position, vector.sub(camera.position).normalize());
-
-        var intersects = raycaster.intersectObjects([cube]);
-
+        console.log(scene.children)
+        var intersects = raycaster.intersectObjects(group.children);
+        console.log(intersects)
         if (intersects.length > 0) {
+            if (INTERSECTED != intersects[0].object) {
+                if (INTERSECTED) INTERSECTED.material.color.setHex(INTERSECTED.material.currentHex)
+                INTERSECTED = intersects[0].object;
+                console.log(intersects[0]);
+                INTERSECTED.material.currentcolor = INTERSECTED.material.color.getHex();
+                INTERSECTED.material.transparent = true;
+                INTERSECTED.material.opacity = 0.5;
+                INTERSECTED.material.color.setHex(0xec0404);
+            }
 
-            console.log(intersects[0]);
-
-            intersects[0].object.material.transparent = true;
-            intersects[0].object.material.opacity = 0.5;
+        } else {
+            if (INTERSECTED) INTERSECTED.material.color.setHex(INTERSECTED.material.currentcolor);
+            INTERSECTED = null;
         }
     }
 
+}
+
+function init2(dom,num) {
+    var domEle = dom;
+    var domRect = domEle.getBoundingClientRect();
+    var clock = new THREE.Clock();
+    var scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000)
+
+    var camera = new THREE.PerspectiveCamera(45, domRect.width / domRect.height, 0.1, 1000);
+    switch (num) {
+        case 1:
+            camera.position.x = 0;
+            camera.position.y = 50;
+            camera.position.z = 0;
+            break;
+        case 2:
+            camera.position.x = -50;
+            camera.position.y = 0;
+            camera.position.z = 0;
+            break;
+        case 3:
+            camera.position.x = 0;
+            camera.position.y = 0;
+            camera.position.z = 50;
+            break;
+    }
+
+    camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+    var renderer = new THREE.WebGLRenderer();
+    renderer.setClearColor(new THREE.Color(0xEEEEEE, 1.0));
+    renderer.setSize(domRect.width, domRect.height);
+    renderer.shadowMapEnabled = true;
+    //trackball
+    var trackballControls = new THREE.TrackballControls(camera, domEle);
+    trackballControls.rotateSpeed = 1.0;
+    trackballControls.zoomSpeed = 1.0;
+    trackballControls.panSpeed = 1.0;
+    trackballControls.staticMoving = true;
+    trackballControls.noZoom  = false;
+    trackballControls.noPan = false;
+    trackballControls.noRotate = true;
+
+
+    //add subtle ambient lighting
+    var ambientLight = new THREE.AmbientLight(0x0c0c0c);
+    scene.add(ambientLight);
+
+    //add spotlight for the shadows
+    var spotLight = new THREE.SpotLight(0xffffff);
+    spotLight.position.set(-40, 60, -10);
+    spotLight.castShadow = true;
+    scene.add(spotLight);
+
+
+
+    //create a cube
+    var cubeGeometry = new THREE.EdgesGeometry(new THREE.BoxGeometry(4, 4, 4));
+
+    var cubeMaterial = new THREE.MeshBasicMaterial({
+        color: 0x7777ff,
+        linewidth: 10
+    });
+    var cube = new THREE.LineSegments(cubeGeometry, cubeMaterial);
+
+    cube.position.x = 0;
+    cube.position.y = 2;
+    cube.position.z = 0;
+
+    //scene.add(cube);
+
+    //create a group
+    var group = new THREE.Group();
+    group.add(cube);
+    scene.add(group)
+
+
+    //add the output of the renderer to the html element
+    domEle.appendChild(renderer.domElement);
+
+
+
+    function render() {
+        var delta = clock.getDelta();
+        trackballControls.update(delta);
+
+        renderer.render(scene, camera);
+        requestAnimationFrame(render);
+    }
+    render();
+
+    //场景对浏览器的自适应
+    domEle.addEventListener('resize', onResize, false);
+    function onResize() {
+        camera.aspect = domRect.width / domRect.height;
+        camera.updateProjectionMatrix();
+        renderer.setSize(domRect.width, domRect.height);
+    }
+
+    //选中图形
+    domEle.addEventListener('mousedown', onDocumentMouseDown, false);
+    var INTERSECTED;
+    function onDocumentMouseDown(event) {
+        event.preventDefault();
+
+        var vector = new THREE.Vector3(((event.clientX - domRect.left) / domRect.width) * 2 - 1, -((event.clientY - domRect.top) / domRect.height) * 2 + 1, 0.5);
+        vector = vector.unproject(camera);
+
+        var raycaster = new THREE.Raycaster(camera.position, vector.sub(camera.position).normalize());
+        console.log(scene.children)
+        var intersects = raycaster.intersectObjects(group.children);
+        console.log(intersects)
+        if (intersects.length > 0) {
+            if (INTERSECTED != intersects[0].object) {
+                if (INTERSECTED) INTERSECTED.material.color.setHex(INTERSECTED.material.currentHex)
+                INTERSECTED = intersects[0].object;
+                console.log(intersects[0]);
+                INTERSECTED.material.currentcolor = INTERSECTED.material.color.getHex();
+                INTERSECTED.material.transparent = true;
+                INTERSECTED.material.opacity = 0.5;
+                INTERSECTED.material.color.setHex(0xec0404);
+            }
+
+        } else {
+            if (INTERSECTED) INTERSECTED.material.color.setHex(INTERSECTED.material.currentcolor);
+            INTERSECTED = null;
+        }
+    }
 
 }
-window.onload = init()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+init2(document.getElementById('WebGL-output-vertical'), 1)
+init2(document.getElementById('WebGL-output-left'), 2)
+init2(document.getElementById('WebGL-output-front'), 3)
+init(document.getElementById('WebGL-output'))
