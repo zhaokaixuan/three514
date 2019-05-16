@@ -241,14 +241,10 @@ function init2(dom,num) {
     renderer.setSize(domRect.width, domRect.height);
     renderer.shadowMapEnabled = true;
     //trackball
-    var trackballControls = new THREE.TrackballControls(camera, domEle);
-    trackballControls.rotateSpeed = 1.0;
-    trackballControls.zoomSpeed = 1.0;
-    trackballControls.panSpeed = 1.0;
-    trackballControls.staticMoving = true;
-    trackballControls.noZoom  = false;
-    trackballControls.noPan = false;
-    trackballControls.noRotate = true;
+    var orbitControls = new THREE.OrbitControls(camera, domEle);
+    orbitControls.target = new THREE.Vector3(0,0,0);
+    orbitControls.enableRotate = false;
+
 
 
     //add subtle ambient lighting
@@ -291,7 +287,7 @@ function init2(dom,num) {
 
     function render() {
         var delta = clock.getDelta();
-        trackballControls.update(delta);
+        orbitControls.update(delta);
 
         renderer.render(scene, camera);
         requestAnimationFrame(render);
